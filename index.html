@@ -1,0 +1,1981 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="A privacy-first weight tracker with local storage, trend visualization, statistics, and CSV/JSON backups." />
+  <title>Weight Tracker</title>
+  <style>
+    @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap');
+
+    :root{
+      --bg:#EFF5F0;
+      --text:#2D3B2E;
+      --muted:#6B7F6C;
+      --accent:#3A8A7D;
+      --danger:#D4726C;
+      --shadow: 0 10px 30px rgba(45,59,46,.10);
+      --radius: 16px;
+
+      --panel: rgba(255,255,255,.55);
+      --panelBorder: rgba(255,255,255,.60);
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: 'Satoshi', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      background: linear-gradient(135deg, #B2C9AD, #C5DBC2, #B8D5D9, #B3D4DB);
+      background-attachment: fixed;
+      color:var(--text);
+      min-height:100vh;
+    }
+
+    /* ---- Header / Hero ---- */
+    header{
+      padding:72px 32px 48px;
+      text-align:center;
+    }
+    header h1{ font-size:40px; font-weight:700; margin:0; letter-spacing:-0.5px; }
+    header p{ margin:14px auto 0; color:var(--muted); font-size:17px; line-height:1.6; max-width:560px; }
+
+    /* ---- Sections container ---- */
+    .sections{
+      max-width:1080px;
+      margin:0 auto;
+      padding:0 32px 80px;
+      display:flex;
+      flex-direction:column;
+      gap:48px;
+    }
+
+    /* ---- Section card ---- */
+    .section{
+      background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,.48));
+      border:1px solid rgba(255,255,255,.65);
+      border-radius:24px;
+      box-shadow: 0 12px 40px rgba(45,59,46,.10);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding:36px 40px;
+    }
+
+    /* ---- Section header ---- */
+    .section-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:20px;
+    }
+    .section-header h2{ margin:0; font-size:22px; font-weight:700; letter-spacing:0.3px; }
+    .section-header small{ color:var(--muted); font-size:14px; }
+    .section-header-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    /* ---- Controls ---- */
+    .controls{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+      margin-top:10px;
+    }
+
+    label{ display:block; font-size:14px; color:var(--muted); margin-bottom:8px; }
+
+    input[type="number"], input[type="date"], select, textarea{
+      width:100%;
+      padding:12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(45,59,46,.12);
+      background: rgba(255,255,255,.55);
+      color:var(--text);
+      font-size:15px;
+      outline:none;
+      appearance:none;
+    }
+    input[type="number"]:focus, input[type="date"]:focus, select:focus, textarea:focus{
+      border-color: rgba(58,138,125,.65);
+      box-shadow: 0 0 0 3px rgba(58,138,125,.18);
+    }
+
+    input[disabled]{ opacity:.55; cursor:not-allowed; }
+
+    /* ---- Date inputs ---- */
+    input[type="date"]{ color-scheme: light; }
+
+    /* Hide native date picker indicator so ONLY our custom white button appears (WebKit) */
+    input[type="date"]::-webkit-calendar-picker-indicator{
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    input[type="date"]::-webkit-inner-spin-button,
+    input[type="date"]::-webkit-clear-button{
+      opacity: 0 !important;
+      pointer-events: none !important;
+      width: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .dateWrap{ position: relative; }
+    .dateWrap input[type="date"]{ padding-right: 44px; }
+    .dateBtn{
+      position:absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 10px;
+      border: 1px solid rgba(45,59,46,.16);
+      background: #fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      user-select:none;
+      padding: 0;
+      line-height: 0;
+      overflow: hidden;
+    }
+    .dateBtn:active{ transform: translateY(-50%) translateY(1px); }
+    .dateBtn svg,
+    .dateBtn img{
+      width: 25px;
+      height: 25px;
+      display:block;
+      object-fit: contain;
+      color:#000;
+    }
+
+    .btns{ display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+
+    button{
+      padding:12px 18px;
+      border-radius:14px;
+      border:1px solid rgba(45,59,46,.12);
+      background: rgba(58,138,125,.14);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:600;
+      font-size:14px;
+      transition: background .15s ease, box-shadow .15s ease;
+    }
+    button:hover{ background: rgba(58,138,125,.22); box-shadow: 0 4px 12px rgba(45,59,46,.10); }
+    button.secondary{ background: rgba(45,59,46,.06); }
+    button.secondary:hover{ background: rgba(45,59,46,.12); box-shadow: 0 4px 12px rgba(45,59,46,.08); }
+    button.danger{ background: rgba(212,114,108,.16); }
+    button.danger:hover{ background: rgba(212,114,108,.26); box-shadow: 0 4px 12px rgba(212,114,108,.12); }
+    button:active{ transform: translateY(1px); }
+    button[disabled]{ opacity:.45; cursor:not-allowed; }
+    button[disabled]:hover{ background: rgba(58,138,125,.14); box-shadow: none; }
+
+    .hint{ margin-top:10px; color:var(--muted); font-size:13px; line-height:1.4; }
+
+    /* ---- Day-Card Navigation ---- */
+    .cardNav{
+      display:flex;
+      align-items:stretch;
+      gap:12px;
+    }
+    .cardArrow{
+      width:44px;
+      flex-shrink:0;
+      border:1px solid rgba(255,255,255,.45);
+      border-radius:14px;
+      background: rgba(255,255,255,.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--text);
+      font-size:20px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      transition: opacity .2s, background .2s;
+    }
+    .cardArrow:hover{ background: rgba(255,255,255,.55); }
+    .cardArrow[disabled]{ opacity:.3; pointer-events:none; }
+
+    .cardTrack{
+      flex:1;
+      min-width:0;
+      display:grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap:12px;
+    }
+
+    .dayCard{
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      padding:16px 10px;
+      border-radius:16px;
+      background: var(--panel);
+      border:1px solid var(--panelBorder);
+      transition: border-color .2s, background .2s;
+    }
+    .dayCard.is-future{ opacity:.55; }
+    .dayCard.has-value{
+      border-color: rgba(58,138,125,.35);
+      background: rgba(58,138,125,.06);
+    }
+
+    .dayCard-dow{
+      font-size:13px;
+      font-weight:600;
+      text-transform:uppercase;
+      color: var(--muted);
+      letter-spacing:.4px;
+    }
+    .dayCard-date{
+      font-size:15px;
+      font-weight:600;
+      color: var(--text);
+    }
+    .dayCard-input{
+      width:100%;
+      text-align:center;
+      border-radius:12px;
+      font-size:15px;
+    }
+    .dayCard-actions{
+      display:flex;
+      gap:6px;
+      justify-content:center;
+    }
+    .dayCard-actions .miniBtn{
+      padding:5px 8px;
+      font-size:11px;
+    }
+
+    .cardPageInfo{
+      text-align:center;
+      color: var(--muted);
+      font-size:13px;
+      margin-top:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+    }
+    .cardPageBtn{
+      display:none;
+      width:32px;
+      height:32px;
+      border:1px solid rgba(255,255,255,.45);
+      border-radius:10px;
+      background: rgba(255,255,255,.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: var(--text);
+      font-size:16px;
+      cursor:pointer;
+      align-items:center;
+      justify-content:center;
+    }
+    .cardPageBtn[disabled]{ opacity:.3; pointer-events:none; }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid rgba(45,59,46,.14);
+      background: rgba(255,255,255,.40);
+      color:var(--muted);
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    .headerUnitWrap{
+      position:relative;
+      display:inline-block;
+    }
+    .headerUnitWrap::after{
+      content:'';
+      position:absolute;
+      right:12px;
+      top:50%;
+      width:8px;
+      height:8px;
+      border-right:2px solid rgba(45,59,46,.70);
+      border-bottom:2px solid rgba(45,59,46,.70);
+      transform: translateY(-65%) rotate(45deg);
+      pointer-events:none;
+    }
+    .headerUnitSelect{
+      width:auto;
+      min-width:150px;
+      height:36px;
+      padding:8px 30px 8px 12px;
+      border-radius:999px;
+      border:1px solid rgba(45,59,46,.14);
+      background: rgba(255,255,255,.40);
+      color:var(--text);
+      font-size:15px;
+      font-weight:600;
+      cursor:pointer;
+      text-align:center;
+      text-align-last:center;
+    }
+
+    /* ---- Chart ---- */
+    .chartTop{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .chartTop .meta{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .canvasWrap{
+      position:relative;
+      border:1px solid rgba(45,59,46,.10);
+      background: rgba(255,255,255,.45);
+      border-radius: 18px;
+      overflow:hidden;
+      height: 560px;
+      min-height: 380px;
+    }
+
+    canvas{ width:100%; height:100%; display:block; }
+
+    .tooltip{
+      position:absolute;
+      pointer-events:none;
+      transform: translate(-50%, -110%);
+      background: rgba(255,255,255,.80);
+      border:1px solid rgba(45,59,46,.16);
+      border-radius: 10px;
+      padding:10px 14px;
+      font-size:13px;
+      color:var(--text);
+      min-width: 140px;
+      box-shadow: 0 10px 30px rgba(45,59,46,.12);
+      opacity:0;
+      transition: opacity .08s ease;
+      white-space:nowrap;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .tooltip b{ font-weight:700; }
+    .tooltip .muted{ color:var(--muted); font-size:11px; }
+
+    .legend{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:6px;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .swatch{
+      width:10px; height:10px;
+      border-radius:3px;
+      background: var(--accent);
+      box-shadow: 0 0 0 2px rgba(58,138,125,.18);
+    }
+
+    .rowActions{ display:flex; gap:8px; justify-content:flex-end; }
+    .miniBtn{
+      padding:7px 12px;
+      border-radius:10px;
+      font-size:12px;
+      background: rgba(45,59,46,.06);
+    }
+    .miniBtn.danger{ background: rgba(212,114,108,.14); }
+
+    /* ---- Toast ---- */
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      background: rgba(255,255,255,.80);
+      border:1px solid rgba(45,59,46,.16);
+      border-radius: 999px;
+      padding:12px 20px;
+      color: var(--text);
+      font-size:14px;
+      opacity: 0;
+      transition: opacity .12s ease;
+      pointer-events:none;
+      box-shadow: var(--shadow);
+      max-width: 92vw;
+      text-align:center;
+      z-index: 60;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* ---- Modal ---- */
+    .modalOverlay{
+      position: fixed;
+      inset: 0;
+      background: rgba(45,59,46,.25);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 18px;
+      z-index: 70;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .modal{
+      width: min(600px, 100%);
+      background: rgba(255,255,255,.88);
+      border:1px solid rgba(255,255,255,.60);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .modal .mh{
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid rgba(45,59,46,.10);
+    }
+    .modal .mh h3{ margin:0; font-size: 14px; letter-spacing: .2px; }
+    .modal .mb{ padding: 14px; color: var(--text); font-size: 13px; line-height: 1.4; }
+    .modal .mf{
+      padding: 12px 14px 14px;
+      display:flex;
+      justify-content:flex-end;
+      gap: 8px;
+      border-top: 1px solid rgba(45,59,46,.10);
+    }
+    .modal .mf button{ min-width: 92px; }
+    .modal .mf .danger{ background: rgba(212,114,108,.16); }
+
+    /* ---- Stats ---- */
+    .statGrid{
+      display:grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap:14px;
+    }
+
+    .statCard{
+      border: 1px solid var(--panelBorder);
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-height: 80px;
+    }
+    .statLabel{ color: var(--muted); font-size: 14px; letter-spacing: .15px; }
+    .statValue{ font-size: 28px; font-weight: 750; color: var(--text); line-height: 1.15; }
+
+    /* ---- Backup ---- */
+    .btnGrid2x2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+    }
+    .btnGrid2x2 button{
+      width:100%;
+      padding:11px 10px;
+      text-align:center;
+      justify-content:center;
+    }
+
+    .importReport{
+      border: 1px solid rgba(45,59,46,.10);
+      border-radius: 14px;
+      background: rgba(255,255,255,.40);
+      padding: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      max-height: 280px;
+      overflow:auto;
+    }
+
+    .sr-only{
+      position:absolute;
+      width:1px;
+      height:1px;
+      padding:0;
+      margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      border:0;
+    }
+
+    /* ---- Scroll reveal animations ---- */
+    .reveal{
+      opacity:0;
+      transform: translateY(40px);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible{
+      opacity:1;
+      transform: translateY(0);
+    }
+    .reveal-children > *{
+      opacity:0;
+      transform: translateY(20px);
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal-children.visible > *{
+      opacity:1;
+      transform: translateY(0);
+    }
+    .reveal-children.visible > *:nth-child(1){ transition-delay: 0ms; }
+    .reveal-children.visible > *:nth-child(2){ transition-delay: 80ms; }
+    .reveal-children.visible > *:nth-child(3){ transition-delay: 160ms; }
+    .reveal-children.visible > *:nth-child(4){ transition-delay: 240ms; }
+
+    /* ---- Responsive: Tablet (768px) ---- */
+    @media (max-width: 768px){
+      header{ padding: 48px 24px 32px; }
+      header h1{ font-size: 32px; }
+      .sections{ padding: 0 24px 60px; gap: 36px; }
+      .section{ padding: 28px 24px; }
+      .controls{ grid-template-columns: 1fr; }
+      .canvasWrap{ height: 420px; }
+      .statGrid{ grid-template-columns: 1fr 1fr; }
+      .dayCard{ padding:12px 6px; }
+      .dayCard-actions .miniBtn{ font-size:10px; padding:4px 6px; }
+      .cardArrow{ width:36px; font-size:18px; }
+      .cardTrack{ gap:10px; }
+    }
+
+    /* ---- Responsive: Phone (480px) ---- */
+    @media (max-width: 480px){
+      header{ padding: 36px 18px 24px; }
+      header h1{ font-size: 28px; }
+      .sections{ padding: 0 16px 48px; gap: 28px; }
+      .section{ padding: 22px 18px; border-radius: 18px; }
+      .btnGrid2x2{ grid-template-columns: 1fr; }
+      .statGrid{ grid-template-columns: 1fr; }
+      .cardArrow{ display:none; }
+      .cardTrack{ grid-template-columns: repeat(2, 1fr); }
+      .cardPageBtn{ display:flex; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Weight Tracker</h1>
+    <p>Select a date range, then enter daily weights in kg or lb. Data is stored by date and preserved across ranges. Future dates can be viewed but not written.</p>
+  </header>
+
+  <main class="sections">
+    <!-- Section 1: Data Entry -->
+    <section id="sectionEntry" class="section reveal" aria-label="Data entry">
+      <div class="section-header">
+        <h2>Data Entry</h2>
+        <small id="rangeLabel">Range</small>
+      </div>
+
+      <div class="controls" style="margin-top:0">
+        <div>
+          <label for="startDate">Start date</label>
+          <div class="dateWrap">
+            <input id="startDate" type="date" />
+            <button class="dateBtn" type="button" aria-label="Open start date picker" data-for="startDate">
+              <img src="calendar.jpg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+        <div>
+          <label for="endDate">End date</label>
+          <div class="dateWrap">
+            <input id="endDate" type="date" />
+            <button class="dateBtn" type="button" aria-label="Open end date picker" data-for="endDate">
+              <img src="calendar.jpg" alt="" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="btns reveal-children">
+        <button id="btnFillEmpty" class="secondary" type="button">Fill empty with last known</button>
+        <button id="btnSample" class="secondary" type="button">Load sample</button>
+        <button id="btnClear" class="danger" type="button">Clear all</button>
+      </div>
+
+      <div class="hint">
+        Date keys are stored as MM-DD-YYYY. You can view future dates, but you cannot save weights for future days.
+      </div>
+    </section>
+
+    <!-- Section 2: Daily Weights Cards -->
+    <section id="sectionTable" class="section reveal" aria-label="Daily weights">
+      <div class="section-header">
+        <h2>Daily Weights</h2>
+        <div class="section-header-actions">
+          <label class="sr-only" for="inputUnit">Input unit</label>
+          <div class="headerUnitWrap">
+            <select id="inputUnit" class="headerUnitSelect" aria-label="Input unit">
+              <option value="kg">Input: kg</option>
+              <option value="lb">Input: lb</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="cardNav">
+        <button id="cardPrev" class="cardArrow" type="button" aria-label="Previous week" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div id="cardTrack" class="cardTrack" role="list"></div>
+        <button id="cardNext" class="cardArrow" type="button" aria-label="Next week" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="cardPageInfo" id="cardPageInfo"></div>
+    </section>
+
+    <!-- Section 3: Chart -->
+    <section id="sectionChart" class="section reveal" aria-label="Chart">
+      <div class="section-header">
+        <h2>Chart</h2>
+        <small id="pointsLabel">0 points</small>
+      </div>
+
+      <div class="controls" style="margin-top:0">
+        <div>
+          <label for="chartUnit">Chart unit</label>
+          <select id="chartUnit" aria-label="Chart unit">
+            <option value="kg">Kilograms (kg)</option>
+            <option value="lb">Pounds (lb)</option>
+          </select>
+        </div>
+        <div>
+          <label for="linkUnits">Link chart to input</label>
+          <select id="linkUnits" aria-label="Link chart to input">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="legend" id="legend"><span class="swatch" aria-hidden="true"></span> Daily weight</div>
+
+      <div class="chartTop" style="margin-top:12px">
+        <div class="meta" id="chartMeta"></div>
+        <div class="meta">
+          <span class="pill" id="trendPill">Trend: n/a</span>
+          <span class="pill" id="deltaPill" style="display:none">Delta: n/a</span>
+        </div>
+      </div>
+
+      <div class="canvasWrap" id="canvasWrap" style="margin-top:10px">
+        <canvas id="chart" width="900" height="520" aria-label="Weight over time" role="img"></canvas>
+        <div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="hint" id="chartHint">Solid lines connect consecutive days. Dashed lines bridge missing days. Future dates have no entries.</div>
+    </section>
+
+    <!-- Section 4: Stats -->
+    <section id="sectionStats" class="section reveal" aria-label="Statistics">
+      <div class="section-header">
+        <h2>Stats</h2>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="pill" id="statTrendPill">Trend: n/a</span>
+          <span class="pill" id="statDeltaPill" style="display:none">Delta: n/a</span>
+        </div>
+      </div>
+
+      <div id="stats" class="statGrid reveal-children" aria-label="Stats"></div>
+    </section>
+
+    <!-- Section 5: Backup -->
+    <section id="sectionBackup" class="section reveal" aria-label="Backup import export">
+      <div class="section-header">
+        <h2>Backup</h2>
+        <span class="pill" id="backupPill">Local backup: on</span>
+      </div>
+
+      <div class="controls" style="margin-top:0">
+        <div>
+          <label for="exportUnit">Export unit</label>
+          <select id="exportUnit" aria-label="Export unit">
+            <option value="kg">Kilograms (kg)</option>
+            <option value="lb">Pounds (lb)</option>
+          </select>
+        </div>
+        <div>
+          <label for="importScope">Import scope</label>
+          <select id="importScope" aria-label="Import scope">
+            <option value="range">Only current range</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btnGrid2x2 reveal-children" style="margin-top:12px" aria-label="Import export buttons">
+        <button id="btnImportJson" type="button">Import JSON</button>
+        <button id="btnImportCsv" type="button">Import CSV</button>
+        <button id="btnExportJson" class="secondary" type="button">Export JSON</button>
+        <button id="btnExportCsv" class="secondary" type="button">Export CSV</button>
+      </div>
+
+      <input id="fileJson" class="sr-only" type="file" accept=".json,application/json" />
+      <input id="fileCsv" class="sr-only" type="file" accept=".csv,text/csv" />
+
+      <div class="hint" style="margin-top:6px">
+        CSV requires header: <span class="pill">date,weight,unit</span>. JSON requires an array of records:
+        <span class="pill">[{ "date":"MM-DD-YYYY","weight":"72.4","unit":"kg" }]</span>.
+        Import writes only within the current range. Future dates are skipped.
+      </div>
+
+      <div id="importReport" class="importReport" aria-label="Import report" style="display:none"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="modalOverlay" class="modalOverlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="mh">
+        <h3 id="modalTitle">Confirm</h3>
+      </div>
+      <div class="mb" id="modalBody">Message</div>
+      <div class="mf">
+        <button id="modalNo" class="secondary" type="button">No</button>
+        <button id="modalYes" class="danger" type="button">Yes</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'weightTracker.v5';
+  const KG_TO_LB = 2.2046226218;
+  const KG_STORAGE_DECIMALS = 3;
+  const MAX_DAYS = 366;
+  const MS_DAY = 86400000;
+
+  const REPORT_DETAIL_LIMIT = 10;
+
+  const el = {
+    startDate: document.getElementById('startDate'),
+    endDate: document.getElementById('endDate'),
+    inputUnit: document.getElementById('inputUnit'),
+    chartUnit: document.getElementById('chartUnit'),
+    linkUnits: document.getElementById('linkUnits'),
+
+    btnFillEmpty: document.getElementById('btnFillEmpty'),
+    btnSample: document.getElementById('btnSample'),
+    btnClear: document.getElementById('btnClear'),
+
+    cardTrack: document.getElementById('cardTrack'),
+    cardPrev: document.getElementById('cardPrev'),
+    cardNext: document.getElementById('cardNext'),
+    cardPageInfo: document.getElementById('cardPageInfo'),
+    stats: document.getElementById('stats'),
+    rangeLabel: document.getElementById('rangeLabel'),
+    pointsLabel: document.getElementById('pointsLabel'),
+    chartMeta: document.getElementById('chartMeta'),
+    trendPill: document.getElementById('trendPill'),
+    deltaPill: document.getElementById('deltaPill'),
+    legend: document.getElementById('legend'),
+
+    canvas: document.getElementById('chart'),
+    canvasWrap: document.getElementById('canvasWrap'),
+    tooltip: document.getElementById('tooltip'),
+    toast: document.getElementById('toast'),
+
+    modalOverlay: document.getElementById('modalOverlay'),
+    modalTitle: document.getElementById('modalTitle'),
+    modalBody: document.getElementById('modalBody'),
+    modalYes: document.getElementById('modalYes'),
+    modalNo: document.getElementById('modalNo'),
+
+    exportUnit: document.getElementById('exportUnit'),
+    btnExportJson: document.getElementById('btnExportJson'),
+    btnExportCsv: document.getElementById('btnExportCsv'),
+    btnImportJson: document.getElementById('btnImportJson'),
+    btnImportCsv: document.getElementById('btnImportCsv'),
+    fileJson: document.getElementById('fileJson'),
+    fileCsv: document.getElementById('fileCsv'),
+    importReport: document.getElementById('importReport'),
+    importScope: document.getElementById('importScope'),
+    backupPill: document.getElementById('backupPill')
+  };
+
+  /* Custom date buttons */
+  function openPickerFor(id){
+    const input = document.getElementById(id);
+    if(!input) return;
+    try{
+      if(typeof input.showPicker === 'function'){
+        input.showPicker();
+      } else {
+        input.focus();
+        input.click();
+      }
+    }catch(_){
+      input.focus();
+    }
+  }
+  document.querySelectorAll('.dateBtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-for');
+      openPickerFor(id);
+    });
+  });
+
+  const ctx = el.canvas.getContext('2d');
+
+  function pad2(n){ return String(n).padStart(2,'0'); }
+
+  function dateFromISO(iso){ return new Date(iso + 'T00:00:00'); }
+  function isoFromDate(d){ return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()); }
+
+  function keyFromDate(d){ return pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '-' + d.getFullYear(); }
+
+  function dateFromKey(key){
+    const m = /^([0-1][0-9])-([0-3][0-9])-([0-9]{4})$/.exec(String(key).trim());
+    if(!m) return null;
+    const mm = Number(m[1]);
+    const dd = Number(m[2]);
+    const yy = Number(m[3]);
+    const d = new Date(yy, mm-1, dd);
+    d.setHours(0,0,0,0);
+    if(d.getFullYear() !== yy || d.getMonth() !== (mm-1) || d.getDate() !== dd) return null;
+    return d;
+  }
+
+  function todayLocalMidnight(){
+    const t = new Date();
+    t.setHours(0,0,0,0);
+    return t;
+  }
+
+  function isFutureDate(d){ return d.getTime() > todayLocalMidnight().getTime(); }
+
+  function fmtDateShort(d){
+    const m = d.toLocaleString(undefined, {month:'short'});
+    return m + ' ' + d.getDate();
+  }
+
+  function addDays(date, n){
+    const d = new Date(date);
+    d.setDate(d.getDate() + n);
+    return d;
+  }
+
+  function daysInclusive(startISO, endISO){
+    const s = dateFromISO(startISO);
+    const e = dateFromISO(endISO);
+    const ms = e.getTime() - s.getTime();
+    return Math.floor(ms / MS_DAY) + 1;
+  }
+
+  function toLb(kg){ return kg * KG_TO_LB; }
+  function toKg(lb){ return lb / KG_TO_LB; }
+
+  function round1(n){ return Math.round(n * 10) / 10; }
+  function roundTo(n, decimals){
+    const f = Math.pow(10, decimals);
+    return Math.round(n * f) / f;
+  }
+  function kgStrFromKgNumStore(kg){
+    return roundTo(kg, KG_STORAGE_DECIMALS).toFixed(KG_STORAGE_DECIMALS);
+  }
+
+  function displayFromKgStr(kgStr, unit){
+    const kg = Number(kgStr);
+    if(!Number.isFinite(kg)) return '';
+    if(unit === 'lb') return round1(toLb(kg)).toFixed(1);
+    return round1(kg).toFixed(1);
+  }
+
+  function kgStrFromDisplayNum(displayNum, unit){
+    const roundedDisplay = round1(displayNum);
+    if(unit === 'lb') return kgStrFromKgNumStore(toKg(roundedDisplay));
+    return kgStrFromKgNumStore(roundedDisplay);
+  }
+
+  let toastTimer = null;
+  function toast(msg){
+    el.toast.textContent = msg;
+    el.toast.style.opacity = '1';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.toast.style.opacity = '0'; }, 1600);
+  }
+
+  function defaultRange(){
+    const today = todayLocalMidnight();
+    const end = today;
+    const start = addDays(end, -29);
+    return { startISO: isoFromDate(start), endISO: isoFromDate(end) };
+  }
+
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      const data = JSON.parse(raw);
+      if(!data || !data.startDate || !data.endDate || typeof data.weightsByDate !== 'object') return null;
+      return {
+        startDate: data.startDate,
+        endDate: data.endDate,
+        weightsByDate: data.weightsByDate || {},
+        inputUnit: (data.inputUnit === 'lb') ? 'lb' : 'kg',
+        chartUnit: (data.chartUnit === 'lb') ? 'lb' : 'kg',
+        linkUnits: (data.linkUnits === 'no') ? 'no' : 'yes',
+        exportUnit: (data.exportUnit === 'lb') ? 'lb' : 'kg'
+      };
+    }catch(_){ return null; }
+  }
+
+  function initState(){
+    const existing = loadState();
+    if(existing) return existing;
+    const r = defaultRange();
+    return { startDate:r.startISO, endDate:r.endISO, weightsByDate:{}, inputUnit:'kg', chartUnit:'kg', linkUnits:'yes', exportUnit:'kg' };
+  }
+
+  let state = initState();
+  let cardPage = 0;
+  function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+  function normalizeStoredWeights(){
+    let changed = false;
+    const keys = Object.keys(state.weightsByDate || {});
+    for(const k of keys){
+      const v = state.weightsByDate[k];
+      const n = Number(v);
+      if(!Number.isFinite(n)){
+        delete state.weightsByDate[k];
+        changed = true;
+        continue;
+      }
+      const normalized = kgStrFromKgNumStore(n);
+      if(v !== normalized){
+        state.weightsByDate[k] = normalized;
+        changed = true;
+      }
+    }
+    if(changed) saveState();
+  }
+  normalizeStoredWeights();
+
+  function syncRangeUI(){
+    el.startDate.value = state.startDate;
+    el.endDate.value = state.endDate;
+
+    const s = dateFromISO(state.startDate);
+    const e = dateFromISO(state.endDate);
+    const d = daysInclusive(state.startDate, state.endDate);
+
+    el.rangeLabel.textContent = fmtDateShort(s) + ' to ' + fmtDateShort(e) + ' (' + d + ' days)';
+  }
+
+  function syncUnitUI(){
+    el.inputUnit.value = state.inputUnit;
+    el.chartUnit.value = state.chartUnit;
+    el.linkUnits.value = state.linkUnits;
+    el.exportUnit.value = state.exportUnit;
+
+    el.legend.innerHTML = '<span class="swatch" aria-hidden="true"></span> Daily weight (' + state.chartUnit + ')';
+  }
+
+  let modalResolver = null;
+  function confirmModal(title, message){
+    el.modalTitle.textContent = title;
+    el.modalBody.textContent = message;
+    el.modalOverlay.style.display = 'flex';
+    el.modalOverlay.setAttribute('aria-hidden', 'false');
+    return new Promise(function(resolve){ modalResolver = resolve; });
+  }
+  function closeModal(result){
+    el.modalOverlay.style.display = 'none';
+    el.modalOverlay.setAttribute('aria-hidden', 'true');
+    const r = modalResolver;
+    modalResolver = null;
+    if(typeof r === 'function') r(result);
+  }
+  el.modalYes.addEventListener('click', function(){ closeModal(true); });
+  el.modalNo.addEventListener('click', function(){ closeModal(false); });
+  el.modalOverlay.addEventListener('click', function(e){ if(e.target === el.modalOverlay) closeModal(false); });
+
+  function clampRangeAndMaybeAdjust(startISO, endISO){
+    const s = dateFromISO(startISO);
+    const e0 = dateFromISO(endISO);
+    if(e0.getTime() < s.getTime()) return { ok:false, message:'End date must be after start date' };
+
+    let d = daysInclusive(startISO, endISO);
+    let finalEndISO = endISO;
+    if(d > MAX_DAYS){
+      const cappedEnd = addDays(s, MAX_DAYS - 1);
+      finalEndISO = isoFromDate(cappedEnd);
+      d = MAX_DAYS;
+      return { ok:true, startISO, endISO:finalEndISO, capped:true, days:d };
+    }
+    return { ok:true, startISO, endISO:finalEndISO, capped:false, days:d };
+  }
+
+  function setWeightForKey(key, kgStr){
+    if(kgStr === '' || kgStr == null){ delete state.weightsByDate[key]; return; }
+    state.weightsByDate[key] = kgStr;
+  }
+
+  function findPrevKeyWithValue(dateObj){
+    const start = dateFromISO(state.startDate);
+    let cur = addDays(dateObj, -1);
+    while(cur.getTime() >= start.getTime()){
+      const k = keyFromDate(cur);
+      if(typeof state.weightsByDate[k] === 'string') return k;
+      cur = addDays(cur, -1);
+    }
+    return null;
+  }
+
+  var renderTableTotalPages = 1;
+
+  function renderTable(){
+    el.cardTrack.innerHTML = '';
+
+    const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const start = dateFromISO(state.startDate);
+    const n = daysInclusive(state.startDate, state.endDate);
+    const today = todayLocalMidnight();
+
+    var totalPages = Math.max(1, Math.ceil(n / 7));
+    if(cardPage >= totalPages) cardPage = totalPages - 1;
+    if(cardPage < 0) cardPage = 0;
+    renderTableTotalPages = totalPages;
+
+    var pageStart = cardPage * 7;
+    var pageEnd = Math.min(pageStart + 7, n);
+
+    for(var i = pageStart; i < pageEnd; i++){
+      const d = addDays(start, i);
+      const key = keyFromDate(d);
+      const isFuture = d.getTime() > today.getTime();
+      const existingKgStr = state.weightsByDate[key];
+      const hasValue = typeof existingKgStr === 'string';
+
+      var card = document.createElement('div');
+      card.className = 'dayCard';
+      card.setAttribute('role', 'listitem');
+      if(isFuture) card.classList.add('is-future');
+      if(hasValue) card.classList.add('has-value');
+
+      var dow = document.createElement('div');
+      dow.className = 'dayCard-dow';
+      dow.textContent = DOW[d.getDay()];
+      card.appendChild(dow);
+
+      var dateEl = document.createElement('div');
+      dateEl.className = 'dayCard-date';
+      dateEl.textContent = key.substring(0, 5);
+      card.appendChild(dateEl);
+
+      var input = document.createElement('input');
+      input.type = 'number';
+      input.inputMode = 'decimal';
+      input.step = '0.1';
+      input.min = '0';
+      input.className = 'dayCard-input';
+      input.placeholder = isFuture ? '—' : (state.inputUnit === 'lb' ? 'lb' : 'kg');
+      input.value = hasValue ? displayFromKgStr(existingKgStr, state.inputUnit) : '';
+      if(isFuture) input.disabled = true;
+
+      input.addEventListener('change', (function(key, d, input){
+        return async function(){
+          const prevKgStr = state.weightsByDate[key];
+
+          if(isFutureDate(d)){
+            input.value = (typeof prevKgStr === 'string') ? displayFromKgStr(prevKgStr, state.inputUnit) : '';
+            toast('Cannot save future weights');
+            return;
+          }
+
+          const raw = input.value;
+          if(raw === ''){
+            if(typeof prevKgStr === 'string'){
+              delete state.weightsByDate[key];
+              saveState();
+              updateAll();
+              toast('Entry cleared');
+            }
+            return;
+          }
+
+          const num = Number(raw);
+          if(!Number.isFinite(num)){
+            input.value = (typeof prevKgStr === 'string') ? displayFromKgStr(prevKgStr, state.inputUnit) : '';
+            return;
+          }
+
+          const nextKgStr = kgStrFromDisplayNum(num, state.inputUnit);
+          const existingDisp = (typeof prevKgStr === 'string') ? displayFromKgStr(prevKgStr, state.inputUnit) : '';
+          const nextDisp = displayFromKgStr(nextKgStr, state.inputUnit);
+
+          if(typeof prevKgStr === 'string' && existingDisp !== nextDisp){
+            const msg = 'Existing: ' + existingDisp + ' ' + state.inputUnit + '. New: ' + nextDisp + ' ' + state.inputUnit + '. Overwrite?';
+            const ok = await confirmModal('Confirm overwrite', msg);
+            if(!ok){
+              input.value = existingDisp;
+              toast('Kept existing entry');
+              return;
+            }
+          }
+
+          setWeightForKey(key, nextKgStr);
+          saveState();
+          updateAll();
+          input.value = nextDisp;
+        };
+      })(key, d, input));
+
+      card.appendChild(input);
+
+      var actions = document.createElement('div');
+      actions.className = 'dayCard-actions';
+
+      var btnCopyPrev = document.createElement('button');
+      btnCopyPrev.type = 'button';
+      btnCopyPrev.className = 'miniBtn';
+      btnCopyPrev.textContent = 'Copy prev';
+      btnCopyPrev.disabled = isFuture;
+      btnCopyPrev.addEventListener('click', (function(key, d){
+        return function(){
+          if(isFutureDate(d)) return;
+          var prevKey = findPrevKeyWithValue(d);
+          if(!prevKey) return;
+          var prevKg = state.weightsByDate[prevKey];
+          if(typeof prevKg !== 'string') return;
+          setWeightForKey(key, prevKg);
+          saveState();
+          renderTable();
+          updateAll();
+        };
+      })(key, d));
+
+      var btnClearRow = document.createElement('button');
+      btnClearRow.type = 'button';
+      btnClearRow.className = 'miniBtn danger';
+      btnClearRow.textContent = 'Clear';
+      btnClearRow.disabled = isFuture;
+      btnClearRow.addEventListener('click', (function(key, d){
+        return function(){
+          if(isFutureDate(d)) return;
+          if(typeof state.weightsByDate[key] === 'string'){
+            delete state.weightsByDate[key];
+            saveState();
+            renderTable();
+            updateAll();
+          }
+        };
+      })(key, d));
+
+      actions.appendChild(btnCopyPrev);
+      actions.appendChild(btnClearRow);
+      card.appendChild(actions);
+
+      el.cardTrack.appendChild(card);
+    }
+
+    el.cardPrev.disabled = (cardPage <= 0);
+    el.cardNext.disabled = (cardPage >= totalPages - 1);
+
+    updateCardPageInfo(start, n, totalPages);
+  }
+
+  function updateCardPageInfo(start, n, totalPages){
+    var pageStart = cardPage * 7;
+    var pageEnd = Math.min(pageStart + 7, n) - 1;
+    var firstDate = addDays(start, pageStart);
+    var lastDate = addDays(start, pageEnd);
+    var firstKey = keyFromDate(firstDate).substring(0, 5);
+    var lastKey = keyFromDate(lastDate).substring(0, 5);
+
+    el.cardPageInfo.innerHTML = '';
+
+    var prevBtn = document.createElement('button');
+    prevBtn.type = 'button';
+    prevBtn.className = 'cardPageBtn';
+    prevBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
+    prevBtn.disabled = (cardPage <= 0);
+    prevBtn.addEventListener('click', function(){ if(cardPage > 0){ cardPage--; renderTable(); } });
+
+    var nextBtn = document.createElement('button');
+    nextBtn.type = 'button';
+    nextBtn.className = 'cardPageBtn';
+    nextBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+    nextBtn.disabled = (cardPage >= totalPages - 1);
+    nextBtn.addEventListener('click', function(){ if(cardPage < totalPages - 1){ cardPage++; renderTable(); } });
+
+    var text = document.createElement('span');
+    text.textContent = firstKey + ' \u2013 ' + lastKey + '  \u00b7  Week ' + (cardPage + 1) + ' of ' + totalPages;
+
+    el.cardPageInfo.appendChild(prevBtn);
+    el.cardPageInfo.appendChild(text);
+    el.cardPageInfo.appendChild(nextBtn);
+  }
+
+  function pointsInRangeKg(){
+    const start = dateFromISO(state.startDate);
+    const n = daysInclusive(state.startDate, state.endDate);
+    const pts = [];
+    for(let i=0;i<n;i++){
+      const d = addDays(start, i);
+      const key = keyFromDate(d);
+      const kgStr = state.weightsByDate[key];
+      if(typeof kgStr !== 'string') continue;
+      const kg = Number(kgStr);
+      if(!Number.isFinite(kg)) continue;
+      pts.push({ idx:i, date:d, wKg:kg });
+    }
+    return pts;
+  }
+
+  function fillEmptyWithLastKnown(){
+    const start = dateFromISO(state.startDate);
+    const n = daysInclusive(state.startDate, state.endDate);
+    const today = todayLocalMidnight();
+
+    let lastKgStr = null;
+    for(let i=0;i<n;i++){
+      const d = addDays(start, i);
+      if(d.getTime() > today.getTime()) break;
+      const key = keyFromDate(d);
+      const kgStr = state.weightsByDate[key];
+      if(typeof kgStr === 'string'){ lastKgStr = kgStr; continue; }
+      if(lastKgStr != null) state.weightsByDate[key] = lastKgStr;
+    }
+    saveState();
+  }
+
+  function computeStats(pointsKg){
+    if(pointsKg.length === 0) return null;
+    const weightsKg = pointsKg.map(p => p.wKg);
+    const minKg = Math.min(...weightsKg);
+    const maxKg = Math.max(...weightsKg);
+    const avgKg = weightsKg.reduce((a,b)=>a+b,0) / weightsKg.length;
+    const deltaKg = pointsKg[pointsKg.length-1].wKg - pointsKg[0].wKg;
+
+    let slopeKgPerDay = 0;
+    if(pointsKg.length >= 2){
+      const xs = pointsKg.map(p => p.idx);
+      const ys = weightsKg;
+      const xbar = xs.reduce((a,b)=>a+b,0) / xs.length;
+      const ybar = ys.reduce((a,b)=>a+b,0) / ys.length;
+      let num = 0, den = 0;
+      for(let i=0;i<xs.length;i++){
+        num += (xs[i]-xbar) * (ys[i]-ybar);
+        den += (xs[i]-xbar) * (xs[i]-xbar);
+      }
+      slopeKgPerDay = den === 0 ? 0 : num/den;
+    }
+    return { minKg, maxKg, avgKg, deltaKg, slopeKgPerDay };
+  }
+
+  function renderStats(pointsKg){
+    el.stats.innerHTML = '';
+    const st = computeStats(pointsKg);
+    const unit = state.chartUnit;
+
+    if(!st){
+      el.stats.innerHTML =
+        '<div class="statCard" style="grid-column:1 / -1">' +
+          '<div class="statLabel">Stats</div>' +
+          '<div class="statValue" style="font-size:16px">No data yet</div>' +
+        '</div>';
+      el.trendPill.textContent = 'Trend: n/a';
+      el.chartMeta.textContent = '';
+      el.pointsLabel.textContent = '0 points';
+      return;
+    }
+
+    const min = (unit === 'lb') ? toLb(st.minKg) : st.minKg;
+    const max = (unit === 'lb') ? toLb(st.maxKg) : st.maxKg;
+    const avg = (unit === 'lb') ? toLb(st.avgKg) : st.avgKg;
+    const delta = (unit === 'lb') ? toLb(st.deltaKg) : st.deltaKg;
+
+    function addCard(label, value){
+      const div = document.createElement('div');
+      div.className = 'statCard';
+      div.innerHTML =
+        '<div class="statLabel">' + label + '</div>' +
+        '<div class="statValue">' + value + '</div>';
+      el.stats.appendChild(div);
+    }
+
+    addCard('Min', round1(min).toFixed(1) + ' ' + unit);
+    addCard('Max', round1(max).toFixed(1) + ' ' + unit);
+    addCard('Avg', round1(avg).toFixed(1) + ' ' + unit);
+
+    const deltaStr = (delta >= 0 ? '+' : '') + round1(delta).toFixed(1) + ' ' + unit;
+    addCard('Delta', deltaStr);
+
+    let trend = 'Flat';
+    if(st.slopeKgPerDay > 0.03) trend = 'Up';
+    else if(st.slopeKgPerDay < -0.03) trend = 'Down';
+    el.trendPill.textContent = 'Trend: ' + trend;
+
+    el.pointsLabel.textContent = pointsKg.length + ' point' + (pointsKg.length===1?'':'s');
+
+    const rStart = dateFromISO(state.startDate);
+    const rEnd = dateFromISO(state.endDate);
+    el.chartMeta.textContent = fmtDateShort(rStart) + ' to ' + fmtDateShort(rEnd) + ' (range)';
+  }
+
+  function resizeCanvasToDisplaySize(canvas){
+    const rect = canvas.getBoundingClientRect();
+    if(rect.width < 10 || rect.height < 10) return false;
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const w = Math.round(rect.width * dpr);
+    const h = Math.round(rect.height * dpr);
+    if(canvas.width !== w || canvas.height !== h){
+      canvas.width = w;
+      canvas.height = h;
+      return true;
+    }
+    return false;
+  }
+
+  let chartHit = [];
+  function showTooltip(x, y, p){
+    el.tooltip.style.left = x + 'px';
+    el.tooltip.style.top = y + 'px';
+    el.tooltip.innerHTML = '<div><b>' + p.value.toFixed(1) + ' ' + state.chartUnit + '</b></div><div class="muted">' + keyFromDate(p.date) + '</div>';
+    el.tooltip.style.opacity = '1';
+  }
+  function hideTooltip(){ el.tooltip.style.opacity = '0'; }
+
+  el.canvasWrap.addEventListener('mousemove', function(ev){
+    const rect = el.canvas.getBoundingClientRect();
+    if(chartHit.length === 0 || rect.width < 10 || rect.height < 10){ hideTooltip(); return; }
+
+    const dpr = el.canvas.width / rect.width;
+    const mxD = (ev.clientX - rect.left) * dpr;
+    const myD = (ev.clientY - rect.top) * dpr;
+
+    let best = null;
+    let bestD = Infinity;
+    for(const p of chartHit){
+      const dx = mxD - p.x;
+      const dy = myD - p.y;
+      const d = dx*dx + dy*dy;
+      if(d < bestD){ bestD = d; best = p; }
+    }
+
+    const radius = 10 * dpr;
+    if(best && bestD <= radius*radius){
+      showTooltip(best.x / dpr, best.y / dpr, best);
+    }else{
+      hideTooltip();
+    }
+  });
+  el.canvasWrap.addEventListener('mouseleave', hideTooltip);
+
+  function drawChart(pointsKg){
+    resizeCanvasToDisplaySize(el.canvas);
+    const W = el.canvas.width;
+    const H = el.canvas.height;
+    if(W < 10 || H < 10) return;
+
+    ctx.clearRect(0,0,W,H);
+
+    if(pointsKg.length === 0){
+      ctx.save();
+      ctx.fillStyle = 'rgba(45,59,46,.45)';
+      ctx.font = Math.round(H*0.04) + 'px Satoshi, ui-sans-serif, system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('Enter weights to see your chart', W/2, H/2);
+      ctx.restore();
+      chartHit = [];
+      return;
+    }
+
+    const unit = state.chartUnit;
+    const nDays = daysInclusive(state.startDate, state.endDate);
+
+    const padding = {l:58, r:18, t:18, b:46};
+    const innerW = W - padding.l - padding.r;
+    const innerH = H - padding.t - padding.b;
+
+    const values = pointsKg.map(p => (unit === 'lb') ? toLb(p.wKg) : p.wKg);
+    let minV = Math.min(...values);
+    let maxV = Math.max(...values);
+
+    const spanV = Math.max(0.6, maxV - minV);
+    minV = minV - spanV*0.15;
+    maxV = maxV + spanV*0.15;
+
+    const x0 = padding.l;
+    const y0 = padding.t;
+
+    function xForIdx(idx){
+      if(nDays <= 1) return x0 + innerW * 0.5;
+      return x0 + (idx / (nDays - 1)) * innerW;
+    }
+    function yForV(v){
+      return y0 + (1 - (v - minV) / (maxV - minV)) * innerH;
+    }
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(45,59,46,.10)';
+    ctx.lineWidth = 1;
+
+    const yTicks = 5;
+    for(let i=0;i<=yTicks;i++){
+      const y = y0 + (i/yTicks)*innerH;
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x0 + innerW, y);
+      ctx.stroke();
+    }
+
+    const xTicks = 6;
+    for(let i=0;i<=xTicks;i++){
+      const x = x0 + (i/xTicks)*innerW;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y0 + innerH);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(107,127,108,.85)';
+    ctx.font = Math.round(H*0.022) + 'px Satoshi, ui-sans-serif, system-ui';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for(let i=0;i<=yTicks;i++){
+      const y = y0 + (i/yTicks)*innerH;
+      const val = (maxV - (i/yTicks)*(maxV-minV));
+      ctx.fillText(val.toFixed(1), x0 - 10, y);
+    }
+    ctx.restore();
+
+    const rangeStart = dateFromISO(state.startDate);
+    ctx.save();
+    ctx.fillStyle = 'rgba(107,127,108,.85)';
+    ctx.font = Math.round(H*0.022) + 'px Satoshi, ui-sans-serif, system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for(let i=0;i<=xTicks;i++){
+      const t = i / xTicks;
+      const idx = (nDays <= 1) ? 0 : Math.round(t * (nDays - 1));
+      const x = xForIdx(idx);
+      const d = addDays(rangeStart, idx);
+      ctx.fillText(fmtDateShort(d), x, y0 + innerH + 12);
+    }
+    ctx.restore();
+
+    const ptsXY = pointsKg.map(p => {
+      const v = (unit === 'lb') ? toLb(p.wKg) : p.wKg;
+      return { idx:p.idx, date:p.date, value:v, x:xForIdx(p.idx), y:yForV(v) };
+    }).sort((a,b)=>a.idx-b.idx);
+
+    ctx.save();
+    for(let i=1;i<ptsXY.length;i++){
+      const a = ptsXY[i-1], b = ptsXY[i];
+      const gap = (b.idx - a.idx) > 1;
+
+      if(gap){
+        ctx.strokeStyle = 'rgba(58,138,125,.30)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 7]);
+      } else {
+        ctx.strokeStyle = 'rgba(58,138,125,.90)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+
+    ctx.setLineDash([]);
+    for(const p of ptsXY){
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(58,138,125,.95)';
+      ctx.arc(p.x, p.y, 3.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    chartHit = ptsXY;
+  }
+
+  function updateAll(){
+    syncRangeUI();
+    syncUnitUI();
+    const pointsKg = pointsInRangeKg();
+    renderStats(pointsKg);
+    drawChart(pointsKg);
+  }
+
+  /* ---------- Import/Export ---------- */
+  function showReport(text){
+    el.importReport.style.display = 'block';
+    el.importReport.textContent = text;
+    el.importReport.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function clearReport(){
+    el.importReport.style.display = 'none';
+    el.importReport.textContent = '';
+  }
+
+  function safeParseNumber(v){
+    if(v == null) return null;
+    const s = String(v).trim();
+    if(s === '') return null;
+    const n = Number(s);
+    if(!Number.isFinite(n)) return null;
+    return n;
+  }
+  function normalizeUnit(u){
+    const s = String(u || '').trim().toLowerCase();
+    if(s === 'kg' || s === 'kilogram' || s === 'kilograms') return 'kg';
+    if(s === 'lb' || s === 'lbs' || s === 'pound' || s === 'pounds') return 'lb';
+    return null;
+  }
+  function inCurrentRange(d){
+    const s = dateFromISO(state.startDate).getTime();
+    const e = dateFromISO(state.endDate).getTime();
+    const t = d.getTime();
+    return t >= s && t <= e;
+  }
+  function convertToKgStr(weightNum, unit){
+    const rounded = round1(weightNum);
+    if(unit === 'kg') return kgStrFromKgNumStore(rounded);
+    return kgStrFromKgNumStore(toKg(rounded));
+  }
+  function downloadFile(filename, mime, content){
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 500);
+  }
+
+  function parseCSV(text){
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+
+    for(let i=0;i<text.length;i++){
+      const ch = text[i];
+      if(inQuotes){
+        if(ch === '"'){
+          const next = text[i+1];
+          if(next === '"'){ cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+      } else {
+        if(ch === '"') inQuotes = true;
+        else if(ch === ','){ row.push(cur); cur=''; }
+        else if(ch === '\n'){ row.push(cur); cur=''; rows.push(row); row=[]; }
+        else if(ch === '\r'){ }
+        else cur += ch;
+      }
+    }
+    row.push(cur);
+    rows.push(row);
+    while(rows.length && rows[rows.length-1].every(c => String(c||'').trim()==='')) rows.pop();
+    return rows;
+  }
+  function headerIndexMap(headerRow){
+    const map = {};
+    for(let i=0;i<headerRow.length;i++){
+      const k = String(headerRow[i] || '').trim().toLowerCase();
+      if(k) map[k] = i;
+    }
+    return map;
+  }
+
+  async function importRecords(records, sourceLabel){
+    clearReport();
+
+    const report = {
+      source: sourceLabel,
+      totalRows: records.length,
+      imported: 0,
+      conflicts: 0,
+      conflictsOverwritten: 0,
+      conflictsSkipped: 0,
+      skippedInvalidDate: 0,
+      skippedInvalidWeight: 0,
+      skippedInvalidUnit: 0,
+      skippedOutOfRange: 0,
+      skippedFutureDate: 0,
+      duplicateWarnings: 0,
+      details: [],
+      warnings: []
+    };
+
+    const temp = {};
+    const seen = {};
+    const today = todayLocalMidnight();
+
+    function addDetail(line, reason, extra){
+      if(report.details.length >= REPORT_DETAIL_LIMIT) return;
+      report.details.push('Line ' + line + ': ' + reason + (extra ? ' (' + extra + ')' : ''));
+    }
+    function addWarning(line, msg){
+      report.duplicateWarnings += 1;
+      if(report.warnings.length >= REPORT_DETAIL_LIMIT) return;
+      report.warnings.push('Line ' + line + ': ' + msg);
+    }
+
+    for(let i=0;i<records.length;i++){
+      const rec = records[i];
+      const line = rec.__line || (i + 2);
+
+      const dateKey = String(rec.date || '').trim();
+      const dateObj = dateFromKey(dateKey);
+      if(!dateObj){ report.skippedInvalidDate += 1; addDetail(line,'Invalid date',dateKey||'missing'); continue; }
+
+      if(dateObj.getTime() > today.getTime()){ report.skippedFutureDate += 1; addDetail(line,'Future date skipped',dateKey); continue; }
+      if(!inCurrentRange(dateObj)){ report.skippedOutOfRange += 1; addDetail(line,'Out of current range skipped',dateKey); continue; }
+
+      const unit = normalizeUnit(rec.unit);
+      if(!unit){ report.skippedInvalidUnit += 1; addDetail(line,'Invalid unit',String(rec.unit||'missing')); continue; }
+
+      const wNum = safeParseNumber(rec.weight);
+      if(wNum == null || wNum <= 0){ report.skippedInvalidWeight += 1; addDetail(line,'Invalid weight',String(rec.weight||'missing')); continue; }
+
+      const kgStr = convertToKgStr(wNum, unit);
+
+      if(seen[dateKey]) addWarning(line,'Duplicate date encountered. Last row wins. Previous line: ' + seen[dateKey]);
+      else seen[dateKey] = line;
+
+      temp[dateKey] = { kgStr, line };
+    }
+
+    const importKeys = Object.keys(temp);
+
+    const conflicts = [];
+    for(const k of importKeys){
+      const incoming = temp[k].kgStr;
+      const existing = state.weightsByDate[k];
+      if(typeof existing === 'string' && existing !== incoming){
+        const exDisp = displayFromKgStr(existing, state.inputUnit);
+        const inDisp = displayFromKgStr(incoming, state.inputUnit);
+        if(exDisp !== inDisp) conflicts.push(k);
+      }
+    }
+    report.conflicts = conflicts.length;
+
+    let overwriteConflicts = false;
+    if(conflicts.length > 0){
+      overwriteConflicts = !!(await confirmModal('Import conflicts','Import has ' + conflicts.length + ' conflicts. Overwrite all existing entries for those dates?'));
+    }
+
+    for(const k of importKeys){
+      const incoming = temp[k].kgStr;
+      const existing = state.weightsByDate[k];
+
+      if(typeof existing === 'string' && existing !== incoming){
+        const exDisp = displayFromKgStr(existing, state.inputUnit);
+        const inDisp = displayFromKgStr(incoming, state.inputUnit);
+        if(exDisp !== inDisp){
+          if(overwriteConflicts){
+            state.weightsByDate[k] = incoming;
+            report.conflictsOverwritten += 1;
+            report.imported += 1;
+          } else report.conflictsSkipped += 1;
+          continue;
+        }
+      }
+      state.weightsByDate[k] = incoming;
+      report.imported += 1;
+    }
+
+    saveState();
+    renderTable();
+    updateAll();
+
+    let out = '';
+    out += 'Import report (' + report.source + ')\n';
+    out += 'Range: ' + state.startDate + ' to ' + state.endDate + '\n\n';
+    out += 'Counts:\n';
+    out += '- Imported: ' + report.imported + '\n';
+    out += '- Conflicts: ' + report.conflicts + '\n';
+    out += '  - Overwritten: ' + report.conflictsOverwritten + '\n';
+    out += '  - Skipped: ' + report.conflictsSkipped + '\n';
+    out += '- Skipped (future date): ' + report.skippedFutureDate + '\n';
+    out += '- Skipped (out of range): ' + report.skippedOutOfRange + '\n';
+    out += '- Skipped (invalid date): ' + report.skippedInvalidDate + '\n';
+    out += '- Skipped (invalid unit): ' + report.skippedInvalidUnit + '\n';
+    out += '- Skipped (invalid weight): ' + report.skippedInvalidWeight + '\n';
+    out += '- Duplicate warnings: ' + report.duplicateWarnings + '\n';
+
+    if(report.details.length){
+      out += '\nDetails (first ' + REPORT_DETAIL_LIMIT + '):\n';
+      for(const d of report.details) out += '- ' + d + '\n';
+    }
+    if(report.warnings.length){
+      out += '\nWarnings (first ' + REPORT_DETAIL_LIMIT + '):\n';
+      for(const w of report.warnings) out += '- ' + w + '\n';
+    }
+
+    showReport(out);
+    toast('Import complete');
+  }
+
+  async function importJSONFile(file){
+    const text = await file.text();
+    let data;
+    try{ data = JSON.parse(text); }
+    catch(_){ showReport('Import report (JSON)\n\nInvalid JSON. Could not parse.'); toast('Import failed'); return; }
+
+    if(!Array.isArray(data)){ showReport('Import report (JSON)\n\nInvalid JSON format. Expected an array of records.'); toast('Import failed'); return; }
+
+    const records = data.map((rec,i)=>({ date:rec?.date, weight:rec?.weight, unit:rec?.unit, __line:i+1 }));
+    await importRecords(records, 'JSON');
+  }
+
+  async function importCSVFile(file){
+    const text = await file.text();
+    const rows = parseCSV(text);
+    if(rows.length < 2){ showReport('Import report (CSV)\n\nCSV must contain a header row and at least one data row.'); toast('Import failed'); return; }
+
+    const map = headerIndexMap(rows[0]);
+    const idxDate = map['date'], idxWeight = map['weight'], idxUnit = map['unit'];
+    if(idxDate == null || idxWeight == null || idxUnit == null){
+      showReport('Import report (CSV)\n\nMissing required headers. Required: date,weight,unit');
+      toast('Import failed'); return;
+    }
+
+    const records = [];
+    for(let i=1;i<rows.length;i++){
+      const r = rows[i];
+      records.push({ date:r[idxDate], weight:r[idxWeight], unit:r[idxUnit], __line:i+1 });
+    }
+    await importRecords(records, 'CSV');
+  }
+
+  function exportRecordsInRange(){
+    const exportUnit = state.exportUnit;
+    const start = dateFromISO(state.startDate);
+    const n = daysInclusive(state.startDate, state.endDate);
+    const out = [];
+    for(let i=0;i<n;i++){
+      const d = addDays(start, i);
+      const key = keyFromDate(d);
+      const kgStr = state.weightsByDate[key];
+      if(typeof kgStr !== 'string') continue;
+      out.push({ date:key, weight:displayFromKgStr(kgStr, exportUnit), unit:exportUnit });
+    }
+    return out;
+  }
+
+  function exportJSON(){
+    const records = exportRecordsInRange();
+    downloadFile(
+      'weight-data_' + state.startDate + '_to_' + state.endDate + '_' + state.exportUnit + '.json',
+      'application/json',
+      JSON.stringify(records,null,2)
+    );
+    toast('Exported JSON');
+  }
+
+  function escapeCSVCell(s){
+    const t = String(s == null ? '' : s);
+    if(/[",\n\r]/.test(t)) return '"' + t.replace(/"/g, '""') + '"';
+    return t;
+  }
+
+  function exportCSV(){
+    const records = exportRecordsInRange();
+    let csv = 'date,weight,unit\n';
+    for(const r of records) csv += escapeCSVCell(r.date)+','+escapeCSVCell(r.weight)+','+escapeCSVCell(r.unit)+'\n';
+    downloadFile(
+      'weight-data_' + state.startDate + '_to_' + state.endDate + '_' + state.exportUnit + '.csv',
+      'text/csv',
+      csv
+    );
+    toast('Exported CSV');
+  }
+
+  el.btnExportJson.addEventListener('click', exportJSON);
+  el.btnExportCsv.addEventListener('click', exportCSV);
+
+  el.btnImportJson.addEventListener('click', function(){
+    el.fileJson.value = '';
+    el.fileJson.click();
+  });
+  el.btnImportCsv.addEventListener('click', function(){
+    el.fileCsv.value = '';
+    el.fileCsv.click();
+  });
+
+  el.fileJson.addEventListener('change', function(){
+    const f = el.fileJson.files && el.fileJson.files[0];
+    if(f) importJSONFile(f);
+  });
+  el.fileCsv.addEventListener('change', function(){
+    const f = el.fileCsv.files && el.fileCsv.files[0];
+    if(f) importCSVFile(f);
+  });
+
+  el.exportUnit.addEventListener('change', function(){
+    state.exportUnit = (el.exportUnit.value === 'lb') ? 'lb' : 'kg';
+    saveState();
+  });
+
+  /* ---------- Controls ---------- */
+  function applyDateRange(){
+    cardPage = 0;
+    const startISO = el.startDate.value;
+    const endISO = el.endDate.value;
+    if(!startISO || !endISO) return;
+
+    const r = clampRangeAndMaybeAdjust(startISO, endISO);
+    if(!r.ok){ toast(r.message || 'Invalid range'); return; }
+
+    state.startDate = r.startISO;
+    state.endDate = r.endISO;
+    saveState();
+
+    if(r.capped){ el.endDate.value = r.endISO; toast('Range capped to ' + MAX_DAYS + ' days'); }
+
+    renderTable();
+    updateAll();
+  }
+  el.startDate.addEventListener('change', applyDateRange);
+  el.endDate.addEventListener('change', applyDateRange);
+
+  el.cardPrev.addEventListener('click', function(){ if(cardPage > 0){ cardPage--; renderTable(); } });
+  el.cardNext.addEventListener('click', function(){ if(cardPage < renderTableTotalPages - 1){ cardPage++; renderTable(); } });
+
+  el.btnFillEmpty.addEventListener('click', function(){
+    fillEmptyWithLastKnown();
+    renderTable();
+    updateAll();
+  });
+
+  el.btnSample.addEventListener('click', function(){
+    const start = dateFromISO(state.startDate);
+    const n = daysInclusive(state.startDate, state.endDate);
+    const today = todayLocalMidnight();
+
+    for(let i=0;i<n;i++){
+      const d = addDays(start, i);
+      if(d.getTime() > today.getTime()) break;
+      if(i % 9 === 0) continue;
+
+      const baseKg = 72.0;
+      const drift = (i / Math.max(1, n-1)) * 0.6;
+      const noise = (Math.random() - 0.5) * 0.8;
+      state.weightsByDate[keyFromDate(d)] = kgStrFromKgNumStore(baseKg + drift + noise);
+    }
+
+    saveState();
+    renderTable();
+    updateAll();
+  });
+
+  el.btnClear.addEventListener('click', function(){
+    state.weightsByDate = {};
+    saveState();
+    clearReport();
+    renderTable();
+    updateAll();
+  });
+
+  el.inputUnit.addEventListener('change', function(){
+    state.inputUnit = (el.inputUnit.value === 'lb') ? 'lb' : 'kg';
+    if(state.linkUnits === 'yes'){
+      state.chartUnit = state.inputUnit;
+      el.chartUnit.value = state.chartUnit;
+    }
+    saveState();
+    renderTable();
+    updateAll();
+  });
+
+  el.chartUnit.addEventListener('change', function(){
+    state.chartUnit = (el.chartUnit.value === 'lb') ? 'lb' : 'kg';
+    if(state.linkUnits === 'yes'){
+      state.inputUnit = state.chartUnit;
+      el.inputUnit.value = state.inputUnit;
+      renderTable();
+    }
+    saveState();
+    updateAll();
+  });
+
+  el.linkUnits.addEventListener('change', function(){
+    state.linkUnits = (el.linkUnits.value === 'no') ? 'no' : 'yes';
+    if(state.linkUnits === 'yes'){
+      state.chartUnit = state.inputUnit;
+      el.chartUnit.value = state.chartUnit;
+    }
+    saveState();
+    updateAll();
+  });
+
+  window.addEventListener('resize', updateAll);
+
+  el.backupPill.textContent = 'Local backup: on';
+  syncRangeUI();
+  syncUnitUI();
+  renderTable();
+  updateAll();
+
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(updateAll);
+  } else {
+    updateAll();
+  }
+
+  /* ---------- Scroll reveal animations ---------- */
+  if('IntersectionObserver' in window){
+    var revealObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal, .reveal-children').forEach(function(el){
+      revealObserver.observe(el);
+    });
+  } else {
+    document.querySelectorAll('.reveal, .reveal-children').forEach(function(el){
+      el.classList.add('visible');
+    });
+  }
+})();
+</script>
+</body>
+</html>

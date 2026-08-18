@@ -1,0 +1,13 @@
+# macOS and local tooling
+.DS_Store
+.Rhistory
+.claude/
+CLAUDE.md
+
+# Personal health data
+weights-*
+
+# Local development artifacts
+debug-weight-tracker-v13.js
+old-layout.html
+weight-tracker-v*.html
