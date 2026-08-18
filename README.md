@@ -2,6 +2,12 @@
 
 A responsive, privacy-first weight tracking app built with vanilla HTML, CSS, and JavaScript. It records daily weights, visualizes trends, calculates summary statistics, and supports portable CSV and JSON backups without sending health data to a server.
 
+## Live demo
+
+[Launch the Weight Tracker](https://danielkang11.github.io/weight-tracker/)
+
+Select **Load sample** to explore the complete experience without entering personal data.
+
 ## Highlights
 
 - Track daily weights in kilograms or pounds
